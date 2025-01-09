@@ -1,0 +1,82 @@
+/*
+ * Copyright (c) Forge Development LLC and contributors
+ * SPDX-License-Identifier: LGPL-2.1-only
+ */
+package net.minecraftforge.launcher;
+
+import net.minecraftforge.util.data.json.AssetsIndex;
+import net.minecraftforge.util.data.json.JsonData;
+import net.minecraftforge.util.data.json.MinecraftVersion;
+import net.minecraftforge.util.download.DownloadUtils;
+import net.minecraftforge.util.hash.HashFunction;
+import net.minecraftforge.util.logging.Log;
+
+import java.io.File;
+
+/** Handles downloading assets for Minecraft. */
+final class DownloadAssets {
+    /**
+     * Downloads assets for the given Minecraft version.
+     *
+     * @param repo        The assets repository to download from (see {@link Constants#RESOURCES_URL}).
+     * @param assetsDir   The directory to store the assets in.
+     * @param versionJson The version.json file for the version to download assets for.
+     */
+    static void download(String repo, File assetsDir, MinecraftVersion versionJson) {
+        AssetsIndex index = JsonData.assetsIndex(downloadIndex(versionJson, assetsDir));
+
+        File objectsDir = new File(assetsDir, "objects");
+        if (!objectsDir.exists() && !objectsDir.mkdirs())
+            throw new IllegalStateException("Failed to create objects directory: " + objectsDir);
+
+        index.objects.forEach((name, asset) -> {
+            File file = new File(objectsDir, getAssetDest(asset.hash));
+            if (file.exists()) {
+                Log.debug("Considering existing file with size " + file.length() + " and hash " + asset.hash + " for " + name);
+                if (file.length() == asset.size && HashFunction.SHA1.sneakyHash(file).equals(asset.hash)) {
+                    Log.debug("Hash and size check succeeded. Skipping.");
+                    return;
+                }
+            }
+
+            // We need to download assets? Release the log so the consumer is aware.
+            Log.release();
+            try {
+                Log.info("Downloading missing asset: " + name);
+                DownloadUtils.downloadFile(file, getAssetDownloadUrl(repo, asset.hash));
+            } catch (Exception e) {
+                throw new IllegalStateException("Failed to download " + name, e);
+            }
+        });
+    }
+
+    private static String getAssetDest(String hash) {
+        return hash.substring(0, 2) + "/" + hash;
+    }
+
+    private static String getAssetDownloadUrl(String repo, String hash) {
+        return repo + getAssetDest(hash);
+    }
+
+    private static File downloadIndex(MinecraftVersion versionJson, File assetsDir) {
+        File index = new File(assetsDir, "indexes/" + versionJson.assetIndex.id + ".json");
+        if (index.exists() && HashFunction.SHA1.sneakyHash(index).equals(versionJson.assetIndex.sha1)) {
+            return index;
+        }
+
+        if (!index.getParentFile().getAbsoluteFile().exists() && !index.getParentFile().getAbsoluteFile().mkdirs())
+            throw new IllegalArgumentException("Failed to create index directory: " + index.getParentFile());
+
+        try {
+            DownloadUtils.downloadFile(index, versionJson.assetIndex.url);
+        } catch (Exception e) {
+            throw new IllegalStateException("Failed to download assets index", e);
+        }
+
+        String newSha1 = HashFunction.SHA1.sneakyHash(index);
+        if (!newSha1.equals(versionJson.assetIndex.sha1))
+            throw new IllegalStateException(String.format("Failed to verify assets index. Expected %s got %s", versionJson.assetIndex.sha1, newSha1));
+
+        return index;
+    }
+}

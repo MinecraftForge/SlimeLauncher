@@ -1,0 +1,105 @@
+import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
+
+plugins {
+    id 'java'
+    id 'idea'
+    id 'eclipse'
+    id 'maven-publish'
+    alias libs.plugins.licenser
+    alias libs.plugins.gradleutils
+    alias libs.plugins.shadow
+}
+
+final projectDisplayName = 'Slime Launcher'
+final projectArtifactId = base.archivesName = 'slime-launcher'
+final projectVendor = 'Forge Development LLC'
+description = 'A slim launcher for Minecraft in the development environment.'
+group = 'net.minecraftforge'
+version = gitversion.tagOffset
+
+println "Version: $version"
+
+java {
+    // Even though older Minecraft supports as far back as 1.5, 8 is compatible with it, and SL is not compiling anything.
+    toolchain.languageVersion = JavaLanguageVersion.of 8
+
+    withSourcesJar()
+}
+
+dependencies {
+    implementation libs.gson
+    implementation libs.jopt
+
+    implementation libs.bundles.utils
+
+    compileOnly libs.nulls
+}
+
+license {
+    header rootProject.file('LICENSE-header.txt')
+    newLine false
+    exclude '**/*.properties'
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
+
+tasks.named('jar', Jar) {
+    manifest {
+        attributes([
+            'Main-Class': 'net.minecraftforge.launcher.Main'
+        ])
+        attributes([
+            'Specification-Title'   : projectDisplayName,
+            'Specification-Vendor'  : projectVendor,
+            'Specification-Version' : gitversion.info.tag,
+            'Implementation-Title'  : projectDisplayName,
+            'Implementation-Vendor' : projectVendor,
+            'Implementation-Version': project.version
+        ], 'net/minecraftforge/launcher/')
+    }
+
+    archiveClassifier = 'thin'
+}
+
+tasks.named('shadowJar', ShadowJar) {
+    enableRelocation = true
+    relocationPrefix = 'net.minecraftforge.launcher.shadow'
+
+    archiveClassifier = null
+}
+
+changelog {
+    fromBase()
+}
+
+publishing {
+    publications.register('mavenJava', MavenPublication) {
+        from components.shadow
+
+        artifactId = projectArtifactId
+        changelog.publish it
+
+        pom { pom ->
+            name = projectDisplayName
+            description = project.description
+
+            gradleutils.pom.setGitHubDetails pom
+
+            licenses {
+                license gradleutils.pom.licenses.LGPLv2_1
+            }
+
+            developers {
+                developer gradleutils.pom.developers.Jonathing
+            }
+        }
+    }
+
+    repositories {
+        maven gradleutils.publishingForgeMaven
+    }
+}
+
+idea.module { downloadJavadoc = downloadSources = true }
