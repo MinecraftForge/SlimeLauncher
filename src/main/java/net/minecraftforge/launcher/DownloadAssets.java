@@ -12,6 +12,7 @@ import net.minecraftforge.util.hash.HashFunction;
 import net.minecraftforge.util.logging.Log;
 
 import java.io.File;
+import java.util.Map;
 
 /** Handles downloading assets for Minecraft. */
 final class DownloadAssets {
@@ -29,13 +30,16 @@ final class DownloadAssets {
         if (!objectsDir.exists() && !objectsDir.mkdirs())
             throw new IllegalStateException("Failed to create objects directory: " + objectsDir);
 
-        index.objects.forEach((name, asset) -> {
-            File file = new File(objectsDir, getAssetDest(asset.hash));
+        for (Map.Entry<String, AssetsIndex.Asset> entry : index.objects.entrySet()) {
+            String name = entry.getKey();
+            AssetsIndex.Asset asset = entry.getValue();
+            String assetDest = getAssetDest(asset.hash);
+            File file = new File(objectsDir, assetDest);
             if (file.exists()) {
                 Log.debug("Considering existing file with size " + file.length() + " and hash " + asset.hash + " for " + name);
                 if (file.length() == asset.size && HashFunction.SHA1.sneakyHash(file).equals(asset.hash)) {
                     Log.debug("Hash and size check succeeded. Skipping.");
-                    return;
+                    continue;
                 }
             }
 
@@ -43,19 +47,15 @@ final class DownloadAssets {
             Log.release();
             try {
                 Log.info("Downloading missing asset: " + name);
-                DownloadUtils.downloadFile(file, getAssetDownloadUrl(repo, asset.hash));
+                DownloadUtils.downloadFile(file, repo + assetDest);
             } catch (Exception e) {
                 throw new IllegalStateException("Failed to download " + name, e);
             }
-        });
+        }
     }
 
     private static String getAssetDest(String hash) {
         return hash.substring(0, 2) + "/" + hash;
-    }
-
-    private static String getAssetDownloadUrl(String repo, String hash) {
-        return repo + getAssetDest(hash);
     }
 
     private static File downloadIndex(MinecraftVersion versionJson, File assetsDir) {
