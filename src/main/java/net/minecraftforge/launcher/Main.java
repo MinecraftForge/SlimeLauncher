@@ -20,7 +20,6 @@ import java.io.InputStream;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
-import java.util.Arrays;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
@@ -82,7 +81,8 @@ public final class Main {
             .accepts("main", "The main class to run")
             .withRequiredArg().ofType(String.class);
 
-        JarVersionInfo.of(Main.class).hello(Log::info, false, true);
+        Package pkg = Main.class.getPackage();
+        Log.info(pkg.getImplementationTitle() + " " + pkg.getImplementationVersion());
 
         SplitArgs split = new SplitArgs(args);
 
@@ -118,15 +118,17 @@ public final class Main {
         MethodHandle mainMethod;
         try {
             Class<?> main = Class.forName(mainClass);
-            mainMethod = MethodHandles.lookup().findStatic(main, "main", MethodType.methodType(void.class, String[].class));
+            mainMethod = MethodHandles.publicLookup().findStatic(main, "main", MethodType.methodType(void.class, String[].class));
         } catch (ClassNotFoundException | NoSuchMethodException | IllegalAccessException e) {
             throw new IllegalStateException("Could not find main class!", e);
         }
 
         Log.info("Sanitizing Minecraft arguments");
-        Arrays.asList(split.mc).replaceAll(s -> s
-            .replace("{asset_index}", versionJson.assetIndex.id)
-            .replace("{assets_root}", assets.getAbsolutePath()));
+        for (int i = 0; i < split.mc.length; i++) {
+            split.mc[i] = split.mc[i]
+                .replace("{asset_index}", versionJson.assetIndex.id)
+                .replace("{assets_root}", assets.getAbsolutePath());
+        }
 
         return new Launcher(mainClass, mainMethod, split.mc);
     }
@@ -155,7 +157,13 @@ public final class Main {
 
         private SplitArgs(String[] args) {
             // we're looking for the first "--"
-            int splitIdx = Arrays.asList(args).indexOf("--");
+            int splitIdx = -1;
+            for (int i = 0; i < args.length; i++) {
+                if (args[i].equals("--")) {
+                    splitIdx = i;
+                    break;
+                }
+            }
 
             if (splitIdx < 0) {
                 this.sl = args;
