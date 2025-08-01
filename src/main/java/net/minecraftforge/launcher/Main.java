@@ -24,9 +24,9 @@ import java.util.Arrays;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
-public class Main {
+public final class Main {
     public static void main(String[] args) throws Throwable {
-        long start = System.nanoTime();
+        long start = System.currentTimeMillis();
         Launcher launcher;
         try {
             Log.capture();
@@ -36,7 +36,7 @@ public class Main {
             throw e;
         }
 
-        long total = (System.nanoTime() - start) / 1_000_000;
+        long total = System.currentTimeMillis() - start;
         if (Log.isCapturing()) {
             Log.drop();
             Log.INFO.print("Slime Launcher setup is up-to-date");
