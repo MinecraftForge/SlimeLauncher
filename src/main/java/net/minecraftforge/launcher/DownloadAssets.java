@@ -36,9 +36,9 @@ final class DownloadAssets {
             String assetDest = getAssetDest(asset.hash);
             File file = new File(objectsDir, assetDest);
             if (file.exists()) {
-                Log.debug("Considering existing file with size " + file.length() + " and hash " + asset.hash + " for " + name);
-                if (file.length() == asset.size && HashFunction.SHA1.sneakyHash(file).equals(asset.hash)) {
-                    Log.debug("Hash and size check succeeded. Skipping.");
+                Log.debug("Considering existing file with size " + file.length() + " for " + name);
+                if (file.length() == asset.size) {
+                    Log.debug("Size check succeeded. Skipping.");
                     continue;
                 }
             }
@@ -48,6 +48,9 @@ final class DownloadAssets {
             try {
                 Log.info("Downloading missing asset: " + name);
                 DownloadUtils.downloadFile(file, repo + assetDest);
+                String newSha1 = HashFunction.SHA1.sneakyHash(file);
+                if (!newSha1.equals(asset.hash))
+                    throw new IllegalStateException(String.format("Failed to verify asset %s. Expected %s got %s", name, asset.hash, newSha1));
             } catch (Exception e) {
                 throw new IllegalStateException("Failed to download " + name, e);
             }
@@ -55,12 +58,12 @@ final class DownloadAssets {
     }
 
     private static String getAssetDest(String hash) {
-        return hash.substring(0, 2) + "/" + hash;
+        return hash.substring(0, 2) + '/' + hash;
     }
 
     private static File downloadIndex(MinecraftVersion versionJson, File assetsDir) {
         File index = new File(assetsDir, "indexes/" + versionJson.assetIndex.id + ".json");
-        if (index.exists() && HashFunction.SHA1.sneakyHash(index).equals(versionJson.assetIndex.sha1)) {
+        if (index.exists() && index.length() == versionJson.assetIndex.size) {
             return index;
         }
 
