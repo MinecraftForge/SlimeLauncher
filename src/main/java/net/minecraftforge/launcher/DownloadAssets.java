@@ -49,8 +49,10 @@ final class DownloadAssets {
                 Log.info("Downloading missing asset: " + name);
                 DownloadUtils.downloadFile(file, repo + assetDest);
                 String newSha1 = HashFunction.SHA1.sneakyHash(file);
-                if (!newSha1.equals(asset.hash))
+                if (!newSha1.equals(asset.hash)) {
+                    file.delete();
                     throw new IllegalStateException(String.format("Failed to verify asset %s. Expected %s got %s", name, asset.hash, newSha1));
+                }
             } catch (Exception e) {
                 throw new IllegalStateException("Failed to download " + name, e);
             }
