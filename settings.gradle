@@ -20,7 +20,7 @@ dependencyResolutionManagement {
         library 'utils-download', 'net.minecraftforge', 'download-utils'  version '0.3.0'
         library 'utils-hash',     'net.minecraftforge', 'hash-utils'      version '0.1.9'
         library 'utils-data',     'net.minecraftforge', 'json-data-utils' version '0.2.1'
-        library 'utils-logging',  'net.minecraftforge', 'log-utils'       version '0.3.1'
+        library 'utils-logging',  'net.minecraftforge', 'log-utils'       version '0.3.2'
         bundle 'utils', [ 'utils-download', 'utils-hash', 'utils-data', 'utils-logging' ]
 
         library 'nulls', 'org.jetbrains', 'annotations' version '26.0.2'
