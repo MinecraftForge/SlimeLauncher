@@ -28,10 +28,10 @@ dependencyResolutionManagement.versionCatalogs.register('libs') {
     library 'gson', 'com.google.code.gson', 'gson'        version '2.11.0'
     library 'jopt', 'net.sf.jopt-simple',   'jopt-simple' version '6.0-alpha-3'
 
-    library 'utils-download', 'net.minecraftforge', 'download-utils'  version '0.3.0'
-    library 'utils-hash',     'net.minecraftforge', 'hash-utils'      version '0.1.9'
-    library 'utils-data',     'net.minecraftforge', 'json-data-utils' version '0.2.1'
-    library 'utils-logging',  'net.minecraftforge', 'log-utils'       version '0.3.2'
+    library 'utils-download', 'net.minecraftforge', 'download-utils'  version '0.4.0'
+    library 'utils-hash',     'net.minecraftforge', 'hash-utils'      version '0.1.12'
+    library 'utils-data',     'net.minecraftforge', 'json-data-utils' version '0.4.0'
+    library 'utils-logging',  'net.minecraftforge', 'log-utils'       version '0.5.0'
     bundle 'utils', [ 'utils-download', 'utils-hash', 'utils-data', 'utils-logging' ]
 
     library 'nulls', 'org.jetbrains', 'annotations' version '26.0.2'

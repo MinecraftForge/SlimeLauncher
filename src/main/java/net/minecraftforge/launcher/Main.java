@@ -10,7 +10,7 @@ import joptsimple.OptionParser;
 import joptsimple.OptionSet;
 import net.minecraftforge.util.data.json.JsonData;
 import net.minecraftforge.util.data.json.MinecraftVersion;
-import net.minecraftforge.util.logging.Log;
+import net.minecraftforge.util.logging.Logger;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -24,25 +24,27 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
 public final class Main {
+    static final Logger LOGGER = Logger.create();
+
     public static void main(String[] args) throws Throwable {
         long start = System.currentTimeMillis();
         Launcher launcher;
         try {
-            Log.capture();
+            LOGGER.capture();
             launcher = run(args);
         } catch (Throwable e) {
-            Log.release();
+            LOGGER.release();
             throw e;
         }
 
         long total = System.currentTimeMillis() - start;
-        if (Log.isCapturing()) {
-            Log.drop();
-            Log.INFO.print("Slime Launcher setup is up-to-date");
+        if (LOGGER.isCapturing()) {
+            LOGGER.drop();
+            LOGGER.getInfo().print("Slime Launcher setup is up-to-date");
         } else {
-            Log.INFO.print("Slime Launcher has finished setting up");
+            LOGGER.getInfo().print("Slime Launcher has finished setting up");
         }
-        Log.INFO.println(", took " + total + "ms\n");
+        LOGGER.getInfo().println(", took " + total + "ms\n");
 
         launcher.run();
     }
@@ -82,14 +84,14 @@ public final class Main {
             .withRequiredArg().ofType(String.class);
 
         Package pkg = Main.class.getPackage();
-        Log.info(pkg.getImplementationTitle() + " " + pkg.getImplementationVersion());
+        LOGGER.info(pkg.getImplementationTitle() + " " + pkg.getImplementationVersion());
 
         SplitArgs split = new SplitArgs(args);
 
         OptionSet options = parser.parse(split.sl);
         if (options.has(helpO)) {
-            parser.printHelpOn(Log.INFO);
-            Log.info("To pass arguments into the main class,\n" +
+            parser.printHelpOn(LOGGER.getInfo());
+            LOGGER.info("To pass arguments into the main class,\n" +
                 "add '--' after the Slime Launcher arguments,\n" +
                 "followed by your main arguments.");
             throw new IllegalArgumentException("Incomplete or invalid arguments");
@@ -109,12 +111,12 @@ public final class Main {
             );
         }
 
-        Log.info("Checking assets");
-        byte indent = Log.push();
+        LOGGER.info("Checking assets");
+        byte indent = LOGGER.push();
         DownloadAssets.download(assetsRepo, assets, versionJson);
-        Log.pop(indent);
+        LOGGER.pop(indent);
 
-        Log.info("Looking for main class: " + mainClass);
+        LOGGER.info("Looking for main class: " + mainClass);
         MethodHandle mainMethod;
         try {
             Class<?> main = Class.forName(mainClass);
@@ -123,7 +125,7 @@ public final class Main {
             throw new IllegalStateException("Could not find main class!", e);
         }
 
-        Log.info("Sanitizing Minecraft arguments");
+        LOGGER.info("Sanitizing Minecraft arguments");
         for (int i = 0; i < split.mc.length; i++) {
             split.mc[i] = split.mc[i]
                 .replace("{asset_index}", versionJson.assetIndex.id)
@@ -146,7 +148,7 @@ public final class Main {
 
         @SuppressWarnings("ConfusingArgumentToVarargsMethod")
         private void run() throws Throwable {
-            Log.info("Launching using main class: " + this.name);
+            LOGGER.info("Launching using main class: " + this.name);
             this.main.invokeExact(this.args);
         }
     }

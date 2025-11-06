@@ -9,7 +9,6 @@ import net.minecraftforge.util.data.json.JsonData;
 import net.minecraftforge.util.data.json.MinecraftVersion;
 import net.minecraftforge.util.download.DownloadUtils;
 import net.minecraftforge.util.hash.HashFunction;
-import net.minecraftforge.util.logging.Log;
 
 import java.io.File;
 import java.util.Map;
@@ -36,17 +35,17 @@ final class DownloadAssets {
             String assetDest = getAssetDest(asset.hash);
             File file = new File(objectsDir, assetDest);
             if (file.exists()) {
-                Log.debug("Considering existing file with size " + file.length() + " for " + name);
+                Main.LOGGER.debug("Considering existing file with size " + file.length() + " for " + name);
                 if (file.length() == asset.size) {
-                    Log.debug("Size check succeeded. Skipping.");
+                    Main.LOGGER.debug("Size check succeeded. Skipping.");
                     continue;
                 }
             }
 
             // We need to download assets? Release the log so the consumer is aware.
-            Log.release();
+            Main.LOGGER.release();
             try {
-                Log.info("Downloading missing asset: " + name);
+                Main.LOGGER.info("Downloading missing asset: " + name);
                 DownloadUtils.downloadFile(file, repo + assetDest);
                 String newSha1 = HashFunction.SHA1.sneakyHash(file);
                 if (!newSha1.equals(asset.hash)) {
