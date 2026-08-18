@@ -16,9 +16,7 @@ import net.minecraftforge.util.logging.Logger;
 
 import java.io.File;
 import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
@@ -26,8 +24,6 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.Locale;
 import java.util.function.Supplier;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipFile;
 
 public final class Main {
     static final Logger LOGGER = Logger.create();
@@ -82,8 +78,8 @@ public final class Main {
             .withRequiredArg().ofType(String.class).defaultsTo(Constants.RESOURCES_URL);
 
         // metadata
-        ArgumentAcceptingOptionSpec<File> metadataZip0 = parser
-            .accepts("metadata", "The metadata.zip to use for runs")
+        ArgumentAcceptingOptionSpec<File> metadataO = parser
+            .accepts("metadata", "The metadata directory to use for runs")
             .withRequiredArg().ofType(File.class);
 
         // main
@@ -121,8 +117,7 @@ public final class Main {
         File cache = options.valueOf(cache0);
         File assets = options.valueOf(assetsO);
         String assetsRepo = options.valueOf(assetsRepo0);
-        // TODO [SlimeLauncher][Jonathing] CHANGE THIS TO DIR! It is already extracted by FG7!
-        File metadataZip = options.valueOf(metadataZip0);
+        File metadata = options.valueOf(metadataO);
         String mainClass = options.valueOf(mainClassO);
         File toObf = options.valueOf(toObfO);
         File toSrg = options.valueOf(toSrgO);
@@ -143,11 +138,9 @@ public final class Main {
         }
 
         MinecraftVersion versionJson;
-        try (ZipFile zip = new ZipFile(metadataZip)) {
-            versionJson = JsonData.minecraftVersion(
-                extract(zip, "minecraft/version.json", cache)
-            );
-        }
+        File versionJsonFile = new File(metadata, "minecraft/version.json");
+        if (versionJsonFile.isFile()) versionJson = JsonData.minecraftVersion(versionJsonFile);
+        else throw new FileNotFoundException("Missing minecraft/version.json in " + metadata.getAbsolutePath());
 
         if (isClient) {
             DownloadAssets.checkAssets(assetsRepo, assets, versionJson, DISABLE_ASSETS);
@@ -301,32 +294,5 @@ public final class Main {
                 System.arraycopy(args, splitIdx + 1, this.mc, 0, args.length - splitIdx - 1);
             }
         }
-    }
-
-    private static File extract(ZipFile zip, String name, File cache) throws IOException {
-        File metadataDir = new File(cache, "metadata");
-        if (!metadataDir.exists() && !metadataDir.mkdirs())
-            throw new IllegalStateException("Failed to create directory: " + metadataDir.getAbsolutePath());
-
-        ZipEntry entry = zip.getEntry(name);
-        if (entry == null)
-            throw new FileNotFoundException("Missing " + name + " in " + zip.getName());
-
-        File output = new File(metadataDir, name);
-        File outputDir = output.getParentFile();
-        if (!outputDir.exists() && !outputDir.mkdirs())
-            throw new IllegalStateException("Failed to create directory: " + outputDir.getAbsolutePath());
-
-        // InputStream#transferTo(OutputStream)
-        try (FileOutputStream out = new FileOutputStream(output)) {
-            InputStream stream = zip.getInputStream(entry);
-            byte[] buf = new byte[8192];
-            int length;
-            while ((length = stream.read(buf)) != -1) {
-                out.write(buf, 0, length);
-            }
-        }
-
-        return output;
     }
 }
