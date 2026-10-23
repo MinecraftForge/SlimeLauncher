@@ -13,22 +13,24 @@ import net.minecraftforge.util.logging.Logger;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
 import java.util.Map;
 
 /** Handles downloading assets for Minecraft. */
 final class DownloadAssets {
     static final Logger LOGGER = Main.LOGGER;
 
-    static void checkAssets(String repo, File assetsDir, MinecraftVersion versionJson, boolean forceSkip) {
+    static File checkAssets(String repo, File assetsDir, MinecraftVersion versionJson, boolean forceSkip, File gameDir) {
         if (forceSkip) {
             LOGGER.info("Force Skipping assets");
-            return;
+            return null;
         }
 
         LOGGER.info("Checking assets");
         byte indent = LOGGER.push();
         try {
-            DownloadAssets.download(repo, assetsDir, versionJson);
+            return DownloadAssets.download(repo, assetsDir, versionJson, gameDir);
         } finally {
             LOGGER.pop(indent);
         }
@@ -41,41 +43,76 @@ final class DownloadAssets {
      * @param assetsDir   The directory to store the assets in.
      * @param versionJson The version.json file for the version to download assets for.
      */
-    static void download(String repo, File assetsDir, MinecraftVersion versionJson) {
+    static File download(String repo, File assetsDir, MinecraftVersion versionJson, File gameDir) {
         AssetsIndex index = JsonData.assetsIndex(downloadIndex(versionJson, assetsDir));
 
         File objectsDir = new File(assetsDir, "objects");
         if (!objectsDir.exists() && !objectsDir.mkdirs())
             throw new IllegalStateException("Failed to create objects directory: " + objectsDir);
 
+        File virtualDir = null;
+        if (index.virtual) {
+            virtualDir = new File(assetsDir, "virtual/" + versionJson.assetIndex.id + '/');
+        } else if (index.map_to_resources) {
+        	virtualDir = new File(gameDir, "resources");
+        }
+
         for (Map.Entry<String, AssetsIndex.Asset> entry : index.objects.entrySet()) {
             String name = entry.getKey();
             AssetsIndex.Asset asset = entry.getValue();
             String assetDest = getAssetDest(asset.hash);
             File file = new File(objectsDir, assetDest);
-            long fileLength = file.length();
-            if (fileLength != 0) {
-                LOGGER.debug("Considering existing file with size " + fileLength + " for " + name);
-                if (fileLength == asset.size) {
-                    LOGGER.debug("Size check succeeded. Skipping.");
-                    continue;
-                }
+            boolean downlaoded = existingValid(file, name, asset);
+
+            if (!downlaoded) {
+	            // We need to download assets? Release the log so the consumer is aware.
+	            LOGGER.release();
+	            try {
+	                Main.LOGGER.info("Downloading missing asset: " + name);
+	                DownloadUtils.downloadFile(file, repo + assetDest);
+	                String newSha1 = HashFunction.sha1().hash(file);
+	                if (!newSha1.equals(asset.hash)) {
+	                    file.delete();
+	                    throw new IllegalStateException(String.format("Failed to verify asset %s. Expected %s got %s", name, asset.hash, newSha1));
+	                }
+	            } catch (Exception e) {
+	                throw new IllegalStateException("Failed to download " + name, e);
+	            }
             }
 
-            // We need to download assets? Release the log so the consumer is aware.
-            LOGGER.release();
-            try {
-                Main.LOGGER.info("Downloading missing asset: " + name);
-                DownloadUtils.downloadFile(file, repo + assetDest);
-                String newSha1 = HashFunction.sha1().hash(file);
-                if (!newSha1.equals(asset.hash)) {
-                    file.delete();
-                    throw new IllegalStateException(String.format("Failed to verify asset %s. Expected %s got %s", name, asset.hash, newSha1));
-                }
-            } catch (Exception e) {
-                throw new IllegalStateException("Failed to download " + name, e);
+            if (virtualDir != null) {
+            	File virtual = new File(virtualDir, name);
+            	if (existingValid(virtual, name, asset))
+            		continue;
+            	LOGGER.release();
+	            try {
+	                Main.LOGGER.info("Copying virtual asset: " + name);
+	                if (!virtual.getParentFile().exists())
+	                	virtual.getParentFile().mkdirs();
+	                Files.copy(file.toPath(), virtual.toPath(), StandardCopyOption.REPLACE_EXISTING);
+	            } catch (Exception e) {
+	                throw new IllegalStateException("Failed to download " + name, e);
+	            }
             }
         }
+
+        return virtualDir;
+    }
+
+    private static boolean existingValid(File existing, String name, AssetsIndex.Asset asset) {
+    	if (!existing.exists())
+    		return false;
+
+        long fileLength = existing.length();
+        if (fileLength != 0) {
+            LOGGER.debug("Considering existing file with size " + fileLength + " for " + name);
+            if (fileLength == asset.size) {
+                LOGGER.debug("Size check succeeded. Skipping.");
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static String getAssetDest(String hash) {

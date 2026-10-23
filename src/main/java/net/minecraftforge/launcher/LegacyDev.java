@@ -194,8 +194,17 @@ final class LegacyDev {
             for (Map.Entry<String, String> entry : values.entrySet()) {
                 if (entry.getValue() == null || entry.getValue().isEmpty())
                     continue;
-                lst.add("--" + entry.getKey());
-                lst.add(entry.getValue());
+
+                if ("tweakClass".equals(entry.getKey())) {
+                	String[] parts = entry.getValue().split(",");
+                	for (String part : parts) {
+                		lst.add("--" + entry.getKey());
+                		lst.add(part);
+                	}
+                } else {
+	                lst.add("--" + entry.getKey());
+	                lst.add(entry.getValue());
+                }
             }
             lst.addAll(extras);
             return lst.toArray(new String[0]);
@@ -216,8 +225,15 @@ final class LegacyDev {
         final OptionSet options = parser.parse(args);
         for (String key : values.keySet()) {
             if (options.hasArgument(key)) {
-                String value = (String) options.valueOf(key);
-                values.put(key, value);
+            	// The command line can pass in multiple tweaker classes, so lets treat it as a comma separated list
+            	if ("tweakClass".equals(key)) {
+            		@SuppressWarnings("unchecked")
+					List<String> supplied = (List<String>)options.valuesOf(key);
+            		values.put(key, String.join(",", supplied));
+            	} else {
+	                String value = (String) options.valueOf(key);
+	                values.put(key, value);
+            	}
             }
         }
 

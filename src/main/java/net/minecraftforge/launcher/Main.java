@@ -81,6 +81,11 @@ public final class Main {
             .accepts("assets-repo", "The assets repository (download server)")
             .withRequiredArg().ofType(String.class).defaultsTo(Constants.RESOURCES_URL);
 
+        // Game Directory, used for virtual assets
+        ArgumentAcceptingOptionSpec<File> gameDirO = parser
+    		.accepts("gameDir", "Directory where Minecraft stores its instance files")
+    		.withRequiredArg().ofType(File.class);
+
         // metadata
         ArgumentAcceptingOptionSpec<File> metadataO = parser
             .accepts("metadata", "The metadata directory or zip to use for runs")
@@ -121,6 +126,7 @@ public final class Main {
         File cache = options.valueOf(cache0);
         File assets = options.valueOf(assetsO);
         String assetsRepo = options.valueOf(assetsRepo0);
+        File gameDir = options.has(gameDirO) ? options.valueOf(gameDirO) : new File(".").getAbsoluteFile();
         File metadata = options.valueOf(metadataO);
         String mainClass = options.valueOf(mainClassO);
         File toObf = options.valueOf(toObfO);
@@ -155,8 +161,9 @@ public final class Main {
             throw new IllegalArgumentException("Invalid metadata path: " + metadata.getAbsolutePath());
         }
 
+        File namedAssets = null;
         if (isClient) {
-            DownloadAssets.checkAssets(assetsRepo, assets, versionJson, DISABLE_ASSETS);
+            namedAssets = DownloadAssets.checkAssets(assetsRepo, assets, versionJson, DISABLE_ASSETS, gameDir);
             LegacyDev.setupNatives(versionJson, new File(cache, "natives"));
         }
 
@@ -188,15 +195,29 @@ public final class Main {
         Class<?> main = findMainClass(mainClass);
         MethodHandle mainMethod = findMainMethod(main);
 
-        LOGGER.info("Sanitizing Minecraft arguments");
-        for (int i = 0; i < mcArgs.length; i++) {
-            mcArgs[i] = mcArgs[i]
-                .replace("{asset_index}", versionJson.assetIndex.id)
-                .replace("{assets_root}", assets.getAbsolutePath());
-        }
+        if (isClient)
+        	replaceClientTokens(mcArgs, versionJson, assets, namedAssets);
 
         return new Launcher(mainClass, mainMethod, mcArgs);
     }
+
+    private static void replaceClientTokens(String[] mcArgs, MinecraftVersion versionJson, File assets, File namedAssets) {
+        LOGGER.info("Sanitizing Minecraft arguments");
+        File virtualAssets = new File(assets, "virtual/" + versionJson.assetIndex.id + "/");
+
+        for (int i = 0; i < mcArgs.length; i++) {
+        	int token = mcArgs[i].indexOf('{');
+        	if (token == -1)
+        		continue;
+
+            mcArgs[i] = mcArgs[i]
+                .replace("{asset_index}", versionJson.assetIndex.id)
+                .replace("{assets_root}", (namedAssets == null ? assets : namedAssets).getAbsolutePath()) // Old versions don't support object hash directory, so we need to know the 'named' folders
+                .replace("{game_assets}", virtualAssets.getAbsolutePath())
+                ;
+        }
+    }
+
 
     private static void setup(File file, String name, Supplier<IMappingFile> map) throws IOException {
         System.setProperty("net.minecraftforge.gradle.GradleStart.srg." + name, file.getCanonicalPath());
